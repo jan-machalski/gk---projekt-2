@@ -86,7 +86,7 @@
             // fileDialogButton
             // 
             fileDialogButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            fileDialogButton.Location = new Point(1102, 47);
+            fileDialogButton.Location = new Point(1109, 47);
             fileDialogButton.Name = "fileDialogButton";
             fileDialogButton.Size = new Size(142, 27);
             fileDialogButton.TabIndex = 1;
@@ -431,9 +431,9 @@
             // lightMoveButton
             // 
             lightMoveButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            lightMoveButton.Location = new Point(1305, 113);
+            lightMoveButton.Location = new Point(1297, 113);
             lightMoveButton.Name = "lightMoveButton";
-            lightMoveButton.Size = new Size(127, 40);
+            lightMoveButton.Size = new Size(161, 40);
             lightMoveButton.TabIndex = 32;
             lightMoveButton.Text = "Zatrzymaj ruch światła";
             lightMoveButton.UseVisualStyleBackColor = true;
