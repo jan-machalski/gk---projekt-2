@@ -110,8 +110,8 @@ namespace projekt_2
                 }
             }
 
-            tangentU = Vector3.Normalize(tangentU);
-            tangentV = Vector3.Normalize(tangentV);
+            //tangentU = Vector3.Normalize(tangentU);
+            //tangentV = Vector3.Normalize(tangentV);
 
             // Obliczenie wektora normalnego N(u, v) = P_u(u, v) x P_v(u, v)
             Vector3 normal = Vector3.Cross(tangentU, tangentV);
