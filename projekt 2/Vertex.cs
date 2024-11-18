@@ -59,8 +59,7 @@ namespace projekt_2
 
             NormalAfterRotation = Vector3.Cross(TangentUAfterRotation, TangentVAfterRotation);
             NormalAfterRotation = Vector3.Normalize(NormalAfterRotation);
-            // Ponowne obliczenie stycznych i normalnych z uwzględnieniem przekształconych punktów
-            // RecalculateTangentsAndNormal(controlPoints, cosX, sinX, cosZ, sinZ);
+
         }
 
         // Funkcja do obrotu wektora wokół osi Z

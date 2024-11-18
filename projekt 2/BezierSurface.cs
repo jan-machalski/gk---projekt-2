@@ -13,6 +13,7 @@ namespace projekt_2
         public List<Triangle> Triangles { get; private set; }
         public float AngleX { get; set; } = 0; // Kąt obrotu wokół osi X
         public float AngleZ { get; set; } = 0; // Kąt obrotu wokół osi Z
+        public List<Vertex> Vertices = new List<Vertex>();
 
         public BezierSurface(Vector3[,] points, int accuracy)
         {
@@ -23,8 +24,29 @@ namespace projekt_2
         public void GenerateSurface(int accuracy)
         {
             Triangles.Clear();
+            Vertices.Clear();
+            Dictionary<(float, float), Vertex> vertexCache = new Dictionary<(float, float), Vertex>();
             float step = 1.0f / accuracy;
 
+            for (int i = 0; i <= accuracy; i++)
+            {
+                for (int j = 0; j <= accuracy; j++)
+                {
+                    float u = i * step;
+                    float v = j * step;
+
+                    // Oblicz wierzchołek tylko raz
+                    if (!vertexCache.ContainsKey((u, v)))
+                    {
+                        Vertex vertex = CalculateVertex(u, v);
+                        vertex.ApplyRotation(AngleX, AngleZ, controlPoints);
+                        vertexCache[(u, v)] = vertex;
+                        Vertices.Add(vertex);
+                    }
+                }
+            }
+
+            // Tworzenie trójkątów na podstawie wierzchołków w cache
             for (int i = 0; i < accuracy; i++)
             {
                 for (int j = 0; j < accuracy; j++)
@@ -34,15 +56,10 @@ namespace projekt_2
                     float u2 = (i + 1) * step;
                     float v2 = (j + 1) * step;
 
-                    Vertex vtx1 = CalculateVertex(u1, v1);
-                    Vertex vtx2 = CalculateVertex(u2, v1);
-                    Vertex vtx3 = CalculateVertex(u1, v2);
-                    Vertex vtx4 = CalculateVertex(u2, v2);
-
-                    vtx1.ApplyRotation(AngleX, AngleZ, controlPoints);
-                    vtx2.ApplyRotation(AngleX, AngleZ, controlPoints);
-                    vtx3.ApplyRotation(AngleX, AngleZ, controlPoints);
-                    vtx4.ApplyRotation(AngleX, AngleZ, controlPoints);
+                    Vertex vtx1 = vertexCache[(u1, v1)];
+                    Vertex vtx2 = vertexCache[(u2, v1)];
+                    Vertex vtx3 = vertexCache[(u1, v2)];
+                    Vertex vtx4 = vertexCache[(u2, v2)];
 
                     Triangles.Add(new Triangle(vtx1, vtx2, vtx4));
                     Triangles.Add(new Triangle(vtx1, vtx4, vtx3));
