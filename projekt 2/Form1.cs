@@ -16,6 +16,7 @@ namespace projekt_2
 		private Vector3 Il = new Vector3(1f, 1f, 1f);
 		private Vector3 Io = new Vector3(1f, 0f, 0f);
 		private Vector3 lightSourcePos = new Vector3(0, 0, 500);
+		private Vector3 lightSourcePos2 = new Vector3(0, 0, 500);
 		private Vector3 V = new Vector3(0, 0, 1);
 		private ColorDialog lightColorDialog = new ColorDialog() { Color = Color.White };
 		private ColorDialog surfaceColorDialog = new ColorDialog() { Color = Color.Red };
@@ -32,11 +33,13 @@ namespace projekt_2
 		private float spiralRadiusIncrement = 2; // Radius increment per step
 		private float spiralAngleIncrement = 0.1f; // Angle increment per step (in radians)
 		bool lightMovement = true;
-		string dataFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"data");
+		string dataFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
+		private int reflectorIntensity = 50;
+		private bool useReflector = false;
 
 
 
-        public Form1()
+		public Form1()
 		{
 			InitializeComponent();
 
@@ -49,10 +52,10 @@ namespace projekt_2
 			LoadDefaultNormalMap();
 			LoadDefaultTexture();
 
-			
+
 			bezierSurface = new BezierSurface(controlPoints, accuracyTrackBar.Value);
 
-            InitializeLightMovement();
+			InitializeLightMovement();
 
 			DrawSurface();
 		}
@@ -64,7 +67,7 @@ namespace projekt_2
 		private void InitializeLightMovement()
 		{
 			lightMoveTimer = new System.Windows.Forms.Timer();
-			lightMoveTimer.Interval = 20;
+			lightMoveTimer.Interval = 50;
 			lightMoveTimer.Tick += LightMoveTimer_Tick;
 			lightMoveTimer.Start();
 		}
@@ -83,6 +86,8 @@ namespace projekt_2
 
 				// Update the light source position
 				lightSourcePos = new Vector3(x, y, lightSourcePos.Z);
+
+				lightSourcePos2 = new Vector3(-x, -y, lightSourcePos2.Z);
 			}
 
 			// Trigger redraw of the surface to reflect the light source's new position
@@ -100,15 +105,15 @@ namespace projekt_2
 
 		private void DrawSurface()
 		{
-            float[,] zBuffer = new float[directBitmap.Width, directBitmap.Height];
-            for (int x = 0; x < directBitmap.Width; x++)
-            {
-                for (int y = 0; y < directBitmap.Height; y++)
-                {
-                    zBuffer[x, y] = float.MinValue; // Inicjuj jako maksymaln¹ wartoœæ
-                }
-            }
-            using (Graphics g = Graphics.FromImage(directBitmap.Bitmap))
+			float[,] zBuffer = new float[directBitmap.Width, directBitmap.Height];
+			for (int x = 0; x < directBitmap.Width; x++)
+			{
+				for (int y = 0; y < directBitmap.Height; y++)
+				{
+					zBuffer[x, y] = float.MinValue; // Inicjuj jako maksymaln¹ wartoœæ
+				}
+			}
+			using (Graphics g = Graphics.FromImage(directBitmap.Bitmap))
 			{
 
 				// Rysowanie trójk¹tów powierzchni Béziera
@@ -129,7 +134,7 @@ namespace projekt_2
 
 				if (drawTriangles)
 				{
-					foreach(var t in bezierSurface.Triangles)
+					foreach (var t in bezierSurface.Triangles)
 					{
 						DrawTriangle(g, t);
 					}
@@ -143,217 +148,217 @@ namespace projekt_2
 
 		}
 
-        private void FillPolygon(List<Vertex> vertices, DirectBitmap fastBitmap, float[,] zBuffer)
-        {
-            int n = vertices.Count;
+		private void FillPolygon(List<Vertex> vertices, DirectBitmap fastBitmap, float[,] zBuffer)
+		{
+			int n = vertices.Count;
 
-            // Create an array of indices sorted by Y-coordinate
-            int[] ind = new int[n];
-            for (int i = 0; i < n; i++)
-            {
-                ind[i] = i;
-            }
-            ind = ind.OrderBy(i => vertices[i].PositionAfterRotation.Y).ToArray();
+			// Create an array of indices sorted by Y-coordinate
+			int[] ind = new int[n];
+			for (int i = 0; i < n; i++)
+			{
+				ind[i] = i;
+			}
+			ind = ind.OrderBy(i => vertices[i].PositionAfterRotation.Y).ToArray();
 
-            // Find ymin and ymax
-            int ymin = (int)Math.Ceiling(vertices[ind[0]].PositionAfterRotation.Y);
-            int ymax = (int)Math.Floor(vertices[ind[n - 1]].PositionAfterRotation.Y);
+			// Find ymin and ymax
+			int ymin = (int)Math.Ceiling(vertices[ind[0]].PositionAfterRotation.Y);
+			int ymax = (int)Math.Floor(vertices[ind[n - 1]].PositionAfterRotation.Y);
 
-            // Initialize Active Edge Table (AET)
-            List<AETEntry> AET = new List<AETEntry>();
+			// Initialize Active Edge Table (AET)
+			List<AETEntry> AET = new List<AETEntry>();
 
-            // For each scanline y from ymin to ymax
-            for (int y = ymin; y <= ymax; y++)
-            {
-                // Update AET for the current scanline
-                UpdateAET(vertices, ind, y, AET);
+			// For each scanline y from ymin to ymax
+			for (int y = ymin; y <= ymax; y++)
+			{
+				// Update AET for the current scanline
+				UpdateAET(vertices, ind, y, AET);
 
-                // Remove edges where yMax == current y
-                AET.RemoveAll(e => (int)Math.Ceiling(e.YMax) == y);
+				// Remove edges where yMax == current y
+				AET.RemoveAll(e => (int)Math.Ceiling(e.YMax) == y);
 
-                // Update AET: sort by CurrentX
-                AET.Sort((e1, e2) => e1.CurrentX.CompareTo(e2.CurrentX));
+				// Update AET: sort by CurrentX
+				AET.Sort((e1, e2) => e1.CurrentX.CompareTo(e2.CurrentX));
 
-                // Fill pixels between pairs of edges
-                for (int i = 0; i < AET.Count - 1; i += 2)
-                {
-                    AETEntry e1 = AET[i];
-                    AETEntry e2 = AET[i + 1];
+				// Fill pixels between pairs of edges
+				for (int i = 0; i < AET.Count - 1; i += 2)
+				{
+					AETEntry e1 = AET[i];
+					AETEntry e2 = AET[i + 1];
 
-                    int xStart = (int)Math.Ceiling(e1.CurrentX);
-                    int xEnd = (int)Math.Floor(e2.CurrentX);
+					int xStart = (int)Math.Ceiling(e1.CurrentX);
+					int xEnd = (int)Math.Floor(e2.CurrentX);
 
-                    if (xEnd < xStart)
-                        continue;
+					if (xEnd < xStart)
+						continue;
 
-                    float totalHeight = ymax - ymin;
+					float totalHeight = ymax - ymin;
 
-                    // Compute alpha for the overall height
-                    float alpha = totalHeight == 0 ? 0 : (y - ymin) / totalHeight;
+					// Compute alpha for the overall height
+					float alpha = totalHeight == 0 ? 0 : (y - ymin) / totalHeight;
 
-                    // Compute beta for each edge
-                    float segmentHeight1 = e1.YMax - e1.YMin;
-                    float beta1 = segmentHeight1 == 0 ? 0 : (y - e1.YMin) / segmentHeight1;
+					// Compute beta for each edge
+					float segmentHeight1 = e1.YMax - e1.YMin;
+					float beta1 = segmentHeight1 == 0 ? 0 : (y - e1.YMin) / segmentHeight1;
 
-                    float segmentHeight2 = e2.YMax - e2.YMin;
-                    float beta2 = segmentHeight2 == 0 ? 0 : (y - e2.YMin) / segmentHeight2;
+					float segmentHeight2 = e2.YMax - e2.YMin;
+					float beta2 = segmentHeight2 == 0 ? 0 : (y - e2.YMin) / segmentHeight2;
 
-                    // Interpolate attributes along the edges
-                    var A = InterpolateVertexAttributes(e1.V0, e1.V2, beta1);
-                    var B = InterpolateVertexAttributes(e2.V0, e2.V2, beta2);
+					// Interpolate attributes along the edges
+					var A = InterpolateVertexAttributes(e1.V0, e1.V2, beta1);
+					var B = InterpolateVertexAttributes(e2.V0, e2.V2, beta2);
 
-                    if (A.Position.X > B.Position.X)
-                    {
-                        Swap(ref A, ref B);
-                    }
+					if (A.Position.X > B.Position.X)
+					{
+						Swap(ref A, ref B);
+					}
 
-                    // Loop over the X range between A and B in logical coordinates
-                    for (int x = xStart; x <= xEnd; x++)
-                    {
-                        float phi = (B.Position.X == A.Position.X) ? 1.0f : (x - A.Position.X) / (B.Position.X - A.Position.X);
+					// Loop over the X range between A and B in logical coordinates
+					for (int x = xStart; x <= xEnd; x++)
+					{
+						float phi = (B.Position.X == A.Position.X) ? 1.0f : (x - A.Position.X) / (B.Position.X - A.Position.X);
 
-                        Vector3 position = A.Position + (B.Position - A.Position) * phi;
-                        float z = position.Z;
-                        Vector3 normal = Vector3.Normalize(A.Normal + (B.Normal - A.Normal) * phi);
-                        Vector3 tangentU = Vector3.Normalize(A.TangentU + (B.TangentU - A.TangentU) * phi);
-                        Vector3 tangentV = Vector3.Normalize(A.TangentV + (B.TangentV - A.TangentV) * phi);
+						Vector3 position = A.Position + (B.Position - A.Position) * phi;
+						float z = position.Z;
+						Vector3 normal = Vector3.Normalize(A.Normal + (B.Normal - A.Normal) * phi);
+						Vector3 tangentU = Vector3.Normalize(A.TangentU + (B.TangentU - A.TangentU) * phi);
+						Vector3 tangentV = Vector3.Normalize(A.TangentV + (B.TangentV - A.TangentV) * phi);
 
-                        float u = A.U + (B.U - A.U) * phi;
-                        float v = A.V + (B.V - A.V) * phi;
+						float u = A.U + (B.U - A.U) * phi;
+						float v = A.V + (B.V - A.V) * phi;
 
-                        Vector3 pixelColor = Io;
+						Vector3 pixelColor = Io;
 
-                        if (useTexture && textureImage != null)
-                        {
-                            u = Math.Clamp(u, 0f, 1f);
-                            v = 1 - Math.Clamp(v, 0f, 1f);
+						if (useTexture && textureImage != null)
+						{
+							u = Math.Clamp(u, 0f, 1f);
+							v = 1 - Math.Clamp(v, 0f, 1f);
 
-                            int textureX = (int)(u * (textureImage.Width - 1));
-                            int textureY = (int)(v * (textureImage.Height - 1));
+							int textureX = (int)(u * (textureImage.Width - 1));
+							int textureY = (int)(v * (textureImage.Height - 1));
 
-                            Color texColor = textureImage.GetPixel(textureX, textureY);
-                            pixelColor = new Vector3(texColor.R / 255f, texColor.G / 255f, texColor.B / 255f);
-                        }
-                        if (useNormalMap && normalMap != null)
-                        {
-                            u = Math.Clamp(u, 0f, 1f);
-                            v = 1 - Math.Clamp(v, 0f, 1f);
-                            int normalMapX = (int)(u * (normalMap.Width - 1));
-                            int normalMapY = (int)((v) * (normalMap.Height - 1));
-                            Color normalColor = normalMap.GetPixel(normalMapX, normalMapY);
+							Color texColor = textureImage.GetPixel(textureX, textureY);
+							pixelColor = new Vector3(texColor.R / 255f, texColor.G / 255f, texColor.B / 255f);
+						}
+						if (useNormalMap && normalMap != null)
+						{
+							u = Math.Clamp(u, 0f, 1f);
+							v = 1 - Math.Clamp(v, 0f, 1f);
+							int normalMapX = (int)(u * (normalMap.Width - 1));
+							int normalMapY = (int)((v) * (normalMap.Height - 1));
+							Color normalColor = normalMap.GetPixel(normalMapX, normalMapY);
 
-                            Vector3 normalMapVector = new Vector3(
-                                (normalColor.R / 255f) * 2 - 1,
-                                (normalColor.G / 255f) * 2 - 1,
-                                (normalColor.B / 255f) * 2 - 1
-                            );
+							Vector3 normalMapVector = new Vector3(
+								(normalColor.R / 255f) * 2 - 1,
+								(normalColor.G / 255f) * 2 - 1,
+								(normalColor.B / 255f) * 2 - 1
+							);
 
-                            var normalNew = new Vector3()
-                            {
-                                X = tangentU.X * normalMapVector.X + tangentV.X * normalMapVector.Y + normal.X * normalMapVector.Z,
-                                Y = tangentU.Y * normalMapVector.X + tangentV.Y * normalMapVector.Y + normal.Y * normalMapVector.Z,
-                                Z = tangentU.Z * normalMapVector.X + tangentV.Z * normalMapVector.Y + normal.Z * normalMapVector.Z
-                            };
+							var normalNew = new Vector3()
+							{
+								X = tangentU.X * normalMapVector.X + tangentV.X * normalMapVector.Y + normal.X * normalMapVector.Z,
+								Y = tangentU.Y * normalMapVector.X + tangentV.Y * normalMapVector.Y + normal.Y * normalMapVector.Z,
+								Z = tangentU.Z * normalMapVector.X + tangentV.Z * normalMapVector.Y + normal.Z * normalMapVector.Z
+							};
 
-                            normal = Vector3.Normalize(normalNew);
-                        }
+							normal = Vector3.Normalize(normalNew);
+						}
 
-                        Vector3 color = ComputeLighting(normal, pixelColor, position);
+						Vector3 color = ComputeLighting(normal, pixelColor, position);
 
-                        // Convert color from Vector3 (0..1) to Color (0..255)
-                        int r = (int)(Math.Min(1.0f, color.X) * 255);
-                        int gColor = (int)(Math.Min(1.0f, color.Y) * 255);
-                        int b = (int)(Math.Min(1.0f, color.Z) * 255);
-                        Color resultColor = Color.FromArgb(r, gColor, b);
+						// Convert color from Vector3 (0..1) to Color (0..255)
+						int r = (int)(Math.Min(1.0f, color.X) * 255);
+						int gColor = (int)(Math.Min(1.0f, color.Y) * 255);
+						int b = (int)(Math.Min(1.0f, color.Z) * 255);
+						Color resultColor = Color.FromArgb(r, gColor, b);
 
-                        // Transform logical coordinates to screen coordinates
-                        int x_screen = x + (bitmapWidth / 2);
-                        int y_screen = (bitmapHeight / 2) - y;
+						// Transform logical coordinates to screen coordinates
+						int x_screen = x + (bitmapWidth / 2);
+						int y_screen = (bitmapHeight / 2) - y;
 
-                        // Set the pixel on the bitmap if within bounds
-                        if (x_screen >= 0 && x_screen < bitmapWidth && y_screen >= 0 && y_screen < bitmapHeight)
-                        {
-                            if (z > zBuffer[x_screen, y_screen])
-                            {
-                                zBuffer[x_screen, y_screen] = z; // Update Z-buffer
-                                fastBitmap.SetPixel(x_screen, y_screen, resultColor); // Draw pixel
-                            }
-                        }
-                    }
-                }
+						// Set the pixel on the bitmap if within bounds
+						if (x_screen >= 0 && x_screen < bitmapWidth && y_screen >= 0 && y_screen < bitmapHeight)
+						{
+							if (z > zBuffer[x_screen, y_screen])
+							{
+								zBuffer[x_screen, y_screen] = z; // Update Z-buffer
+								fastBitmap.SetPixel(x_screen, y_screen, resultColor); // Draw pixel
+							}
+						}
+					}
+				}
 
-                // Update CurrentX for each edge in AET
-                foreach (var edge in AET)
-                {
-                    edge.CurrentX += edge.OneOverM;
-                }
-            }
-        }
+				// Update CurrentX for each edge in AET
+				foreach (var edge in AET)
+				{
+					edge.CurrentX += edge.OneOverM;
+				}
+			}
+		}
 
-        // Method to update AET for the current scanline
-        private void UpdateAET(List<Vertex> vertices, int[] ind, int y, List<AETEntry> AET)
-        {
-            int n = vertices.Count;
+		// Method to update AET for the current scanline
+		private void UpdateAET(List<Vertex> vertices, int[] ind, int y, List<AETEntry> AET)
+		{
+			int n = vertices.Count;
 
-            for (int k = 0; k < n; k++)
-            {
-                int i = ind[k];
-                int vertexY = (int)Math.Ceiling(vertices[i].PositionAfterRotation.Y);
+			for (int k = 0; k < n; k++)
+			{
+				int i = ind[k];
+				int vertexY = (int)Math.Ceiling(vertices[i].PositionAfterRotation.Y);
 
-                if (vertexY == y)
-                {
-                    Vertex Pi = vertices[i];
-                    int prevIndex = (i - 1 + n) % n;
-                    Vertex Pi_prev = vertices[prevIndex];
-                    int nextIndex = (i + 1) % n;
-                    Vertex Pi_next = vertices[nextIndex];
+				if (vertexY == y)
+				{
+					Vertex Pi = vertices[i];
+					int prevIndex = (i - 1 + n) % n;
+					Vertex Pi_prev = vertices[prevIndex];
+					int nextIndex = (i + 1) % n;
+					Vertex Pi_next = vertices[nextIndex];
 
-                    // Edge Pi to Pi_prev
-                    if ((int)Math.Ceiling(Pi_prev.PositionAfterRotation.Y) > vertexY)
-                        AET.Add(new AETEntry(Pi, Pi_prev));
-                    else if ((int)Math.Ceiling(Pi_prev.PositionAfterRotation.Y) < vertexY)
-                        AET.RemoveAll(e => e.EqualsEdge(Pi, Pi_prev));
+					// Edge Pi to Pi_prev
+					if ((int)Math.Ceiling(Pi_prev.PositionAfterRotation.Y) > vertexY)
+						AET.Add(new AETEntry(Pi, Pi_prev));
+					else if ((int)Math.Ceiling(Pi_prev.PositionAfterRotation.Y) < vertexY)
+						AET.RemoveAll(e => e.EqualsEdge(Pi, Pi_prev));
 
-                    // Edge Pi to Pi_next
-                    if ((int)Math.Ceiling(Pi_next.PositionAfterRotation.Y) > vertexY)
-                        AET.Add(new AETEntry(Pi, Pi_next));
-                    else if ((int)Math.Ceiling(Pi_next.PositionAfterRotation.Y) < vertexY)
-                        AET.RemoveAll(e => e.EqualsEdge(Pi, Pi_next));
-                }
-            }
-        }
+					// Edge Pi to Pi_next
+					if ((int)Math.Ceiling(Pi_next.PositionAfterRotation.Y) > vertexY)
+						AET.Add(new AETEntry(Pi, Pi_next));
+					else if ((int)Math.Ceiling(Pi_next.PositionAfterRotation.Y) < vertexY)
+						AET.RemoveAll(e => e.EqualsEdge(Pi, Pi_next));
+				}
+			}
+		}
 
-        // Method to interpolate attributes between two vertices
-        private InterpolatedAttributes InterpolateVertexAttributes(Vertex v0, Vertex v2, float t)
-        {
-            Vector3 position = v0.PositionAfterRotation + (v2.PositionAfterRotation - v0.PositionAfterRotation) * t;
-            Vector3 normal = Vector3.Normalize(v0.NormalAfterRotation + (v2.NormalAfterRotation - v0.NormalAfterRotation) * t);
-            Vector3 tangentU = Vector3.Normalize(v0.TangentUAfterRotation + (v2.TangentUAfterRotation - v0.TangentUAfterRotation) * t);
-            Vector3 tangentV = Vector3.Normalize(v0.TangentVAfterRotation + (v2.TangentVAfterRotation - v0.TangentVAfterRotation) * t);
-            float u = v0.U + (v2.U - v0.U) * t;
-            float v = v0.V + (v2.V - v0.V) * t;
+		// Method to interpolate attributes between two vertices
+		private InterpolatedAttributes InterpolateVertexAttributes(Vertex v0, Vertex v2, float t)
+		{
+			Vector3 position = v0.PositionAfterRotation + (v2.PositionAfterRotation - v0.PositionAfterRotation) * t;
+			Vector3 normal = Vector3.Normalize(v0.NormalAfterRotation + (v2.NormalAfterRotation - v0.NormalAfterRotation) * t);
+			Vector3 tangentU = Vector3.Normalize(v0.TangentUAfterRotation + (v2.TangentUAfterRotation - v0.TangentUAfterRotation) * t);
+			Vector3 tangentV = Vector3.Normalize(v0.TangentVAfterRotation + (v2.TangentVAfterRotation - v0.TangentVAfterRotation) * t);
+			float u = v0.U + (v2.U - v0.U) * t;
+			float v = v0.V + (v2.V - v0.V) * t;
 
-            return new InterpolatedAttributes
-            {
-                Position = position,
-                Normal = normal,
-                TangentU = tangentU,
-                TangentV = tangentV,
-                U = u,
-                V = v
-            };
-        }
+			return new InterpolatedAttributes
+			{
+				Position = position,
+				Normal = normal,
+				TangentU = tangentU,
+				TangentV = tangentV,
+				U = u,
+				V = v
+			};
+		}
 
-        // Class for interpolated attributes
-        private class InterpolatedAttributes
-        {
-            public Vector3 Position;
-            public Vector3 Normal;
-            public Vector3 TangentU;
-            public Vector3 TangentV;
-            public float U;
-            public float V;
-        }
+		// Class for interpolated attributes
+		private class InterpolatedAttributes
+		{
+			public Vector3 Position;
+			public Vector3 Normal;
+			public Vector3 TangentU;
+			public Vector3 TangentV;
+			public float U;
+			public float V;
+		}
 
 		private void Swap<T>(ref T a, ref T b)
 		{
@@ -364,7 +369,7 @@ namespace projekt_2
 
 		private Vector3 ComputeLighting(Vector3 normal, Vector3 pixelColor, Vector3 pixelPosition)
 		{
-			// Compute the light vector dynamically
+			// Compute the light vector
 			Vector3 L = Vector3.Normalize(lightSourcePos - pixelPosition);
 
 			// Normalize the normal vector
@@ -373,33 +378,49 @@ namespace projekt_2
 			// Normalize the view vector
 			Vector3 V_normalized = Vector3.Normalize(V);
 
-            if (Vector3.Dot(normal, V_normalized) < 0)
-            {
-                normal = -normal; // Odwróæ normaln¹
-            }
+			if (Vector3.Dot(normal, V_normalized) < 0)
+			{
+				normal = -normal; // Odwróæ normaln¹
+			}
+			// Compute cos(theta) between N and L
+			float cosNL = Vector3.Dot(normal, L);
 
-
-            // Compute cos(theta) between N and L
-            float cosNL =  Vector3.Dot(normal, L);
-
-            cosNL =  Math.Max(0, cosNL); // Clamp to 0 if negative
+			cosNL = Math.Max(0, cosNL); // Clamp to 0 if negative
 
 			// Compute R = 2(N•L)N - L
-			Vector3 R = 2 * Vector3.Dot(normal,L)*normal - L;
-			R = Vector3.Normalize(R);
+			Vector3 R = 2 * Vector3.Dot(normal, L) * normal - L;
+			//R = Vector3.Normalize(R);
 
 			// Compute cos(phi) between R and V
 			float cosRV = Vector3.Dot(R, V_normalized);
 			cosRV = Math.Max(0, cosRV); // Clamp to 0 if negative
+			
 
-			// Compute diffuse component
-			Vector3 diffuse = kd * Il * pixelColor * cosNL;
+			Vector3 L2 = Vector3.Normalize(lightSourcePos2 - pixelPosition);
+			float cosNL2 = Vector3.Dot(normal, L2);
+
+			cosNL2 = Math.Max(0, cosNL2);
+			Vector3 R2 = 2 * Vector3.Dot(normal, L2) * normal - L2;
+			//R2 = Vector3.Normalize(R2);
+
+			float cosRV2 = Vector3.Dot(R2, V_normalized);
+			cosRV2 = Math.Max(0, cosRV2); // Clamp to 0 if negative
+
+			float factor1 = (float)Math.Pow(Vector3.Dot(L,Vector3.Normalize(lightSourcePos)), reflectorIntensity);
+			float factor2 = (float)Math.Pow(Vector3.Dot(L2, Vector3.Normalize(lightSourcePos2)), reflectorIntensity);
+			if (!useReflector)
+				factor1 = factor2 = 1;
+
+			Vector3 diffuse = factor1 * kd * Il * pixelColor * cosNL;
+			Vector3 diffuse2 = factor2 * kd * Il * pixelColor * cosNL2;
 
 			// Compute specular component
-			Vector3 specular = ks * Il * pixelColor * (float)Math.Pow(cosRV, m);
+			Vector3 specular = factor1 * ks * Il * pixelColor * (float)Math.Pow(cosRV, m);
+
+			Vector3 specular2 = factor2 * ks * Il * pixelColor * (float)Math.Pow(cosRV2, m);
 
 			// Total intensity
-			Vector3 I = diffuse + specular;
+			Vector3 I = diffuse + specular + diffuse2 + specular2;
 
 			// Ensure the intensity values are within 0..1
 			I = Vector3.Min(I, new Vector3(1, 1, 1));
@@ -482,6 +503,7 @@ namespace projekt_2
 						controlPoints[i, j] = points[i * 4 + j];
 					}
 				}
+				bezierSurface = new BezierSurface(controlPoints, accuracyTrackBar.Value);
 			}
 			catch (Exception ex)
 			{
@@ -493,7 +515,7 @@ namespace projekt_2
 		{
 			label2.Text = accuracyTrackBar.Value.ToString();
 			bezierSurface.GenerateSurface(accuracyTrackBar.Value); // Generacja z now¹ dok³adnoœci¹
-        }
+		}
 
 		private void zTurnTrackBar_Scroll(object sender, EventArgs e)
 		{
@@ -502,13 +524,13 @@ namespace projekt_2
 			bezierSurface.AngleZ = angle;
 
 
-            Parallel.ForEach(bezierSurface.Vertices, v =>
-            {
-                v.ApplyRotation(bezierSurface.AngleX, bezierSurface.AngleZ, controlPoints);
+			Parallel.ForEach(bezierSurface.Vertices, v =>
+			{
+				v.ApplyRotation(bezierSurface.AngleX, bezierSurface.AngleZ, controlPoints);
 
-            });
+			});
 
-        }
+		}
 
 		private void xTurnTrackBar_Scroll(object sender, EventArgs e)
 		{
@@ -520,26 +542,26 @@ namespace projekt_2
 			{
 				v.ApplyRotation(bezierSurface.AngleX, bezierSurface.AngleZ, controlPoints);
 
-            });
-        }
+			});
+		}
 
 		private void kdTrackBar_Scroll(object sender, EventArgs e)
 		{
 			label8.Text = ((float)kdTrackBar.Value / 100).ToString();
 			kd = (float)kdTrackBar.Value / 100;
-        }
+		}
 
 		private void ksTrackBar_Scroll(object sender, EventArgs e)
 		{
 			label10.Text = ((float)ksTrackBar.Value / 100).ToString();
 			ks = (float)ksTrackBar.Value / 100;
-        }
+		}
 
 		private void mTrackBar_Scroll(object sender, EventArgs e)
 		{
 			label12.Text = mTrackBar.Value.ToString();
 			m = mTrackBar.Value;
-        }
+		}
 
 		private void lightColorButton_Click(object sender, EventArgs e)
 		{
@@ -547,7 +569,7 @@ namespace projekt_2
 			{
 				lightColorPanel.BackColor = lightColorDialog.Color;
 				Il = new Vector3((float)lightColorDialog.Color.R / 255, (float)lightColorDialog.Color.G / 255, (float)lightColorDialog.Color.B / 255);
-            }
+			}
 		}
 
 		private void surfaceColorButton_Click(object sender, EventArgs e)
@@ -556,7 +578,7 @@ namespace projekt_2
 			{
 				surfaceColorPanel.BackColor = surfaceColorDialog.Color;
 				Io = new Vector3((float)surfaceColorDialog.Color.R / 255, (float)surfaceColorDialog.Color.G / 255, (float)surfaceColorDialog.Color.B / 255);
-            }
+			}
 		}
 
 		private void colorStructureRadioButton_CheckedChanged(object sender, EventArgs e)
@@ -582,17 +604,17 @@ namespace projekt_2
 
 		private void chooseImageButton_Click(object sender, EventArgs e)
 		{
-            OpenFileDialog openFileDialog = new OpenFileDialog
-            {
-                Filter = "Image Files|*.bmp;*.jpg;*.jpeg;*.png;*.gif",
-                Title = "Wybierz obraz tekstury"
-            };
-            if (Directory.Exists(dataFolderPath))
-            {
+			OpenFileDialog openFileDialog = new OpenFileDialog
+			{
+				Filter = "Image Files|*.bmp;*.jpg;*.jpeg;*.png;*.gif",
+				Title = "Wybierz obraz tekstury"
+			};
+			if (Directory.Exists(dataFolderPath))
+			{
 				openFileDialog.InitialDirectory = dataFolderPath;
-            }
+			}
 
-            if (openFileDialog.ShowDialog() == DialogResult.OK)
+			if (openFileDialog.ShowDialog() == DialogResult.OK)
 			{
 				try
 				{
@@ -614,7 +636,7 @@ namespace projekt_2
 
 					useTexture = true;
 					ImageRadioButton.Checked = true; // Switch to texture mode
-                }
+				}
 				catch (Exception ex)
 				{
 					MessageBox.Show("B³¹d podczas ³adowania obrazu tekstury: " + ex.Message);
@@ -674,21 +696,21 @@ namespace projekt_2
 		private void normalMapCheckBox_CheckedChanged(object sender, EventArgs e)
 		{
 			useNormalMap = normalMapCheckBox.Checked;
-        }
+		}
 
 		private void loadNormalButton_Click(object sender, EventArgs e)
 		{
-            OpenFileDialog openFileDialog = new OpenFileDialog
-            {
-                Filter = "Image Files|*.bmp;*.jpg;*.jpeg;*.png;*.gif",
-                Title = "Wybierz obraz tekstury"
-            };
-            if (Directory.Exists(dataFolderPath))
-            {
-                openFileDialog.InitialDirectory = dataFolderPath;
-            }
+			OpenFileDialog openFileDialog = new OpenFileDialog
+			{
+				Filter = "Image Files|*.bmp;*.jpg;*.jpeg;*.png;*.gif",
+				Title = "Wybierz obraz tekstury"
+			};
+			if (Directory.Exists(dataFolderPath))
+			{
+				openFileDialog.InitialDirectory = dataFolderPath;
+			}
 
-            if (openFileDialog.ShowDialog() == DialogResult.OK)
+			if (openFileDialog.ShowDialog() == DialogResult.OK)
 			{
 				try
 				{
@@ -771,7 +793,7 @@ namespace projekt_2
 		private void drawTrianglesCheckBox_CheckedChanged(object sender, EventArgs e)
 		{
 			drawTriangles = drawTrianglesCheckBox.Checked;
-        }
+		}
 
 		private void fillTrianglesCheckBox_CheckedChanged(object sender, EventArgs e)
 		{
@@ -796,6 +818,26 @@ namespace projekt_2
 		{
 			label15.Text = lightSourceTrackBar.Value.ToString();
 			lightSourcePos = new Vector3(lightSourcePos.X, lightSourcePos.Y, lightSourceTrackBar.Value);
+			lightSourcePos2 = new Vector3(lightSourcePos2.X, lightSourcePos2.Y, lightSourceTrackBar.Value);
+		}
+
+		private void reflectorAngleBar_Scroll(object sender, EventArgs e)
+		{
+			reflectorIntensity = reflectorAngleBar.Value;
+			label16.Text = reflectorIntensity.ToString();
+		}
+
+		private void pointLightButton_CheckedChanged(object sender, EventArgs e)
+		{
+			if (pointLightButton.Checked)
+				useReflector = false;
+
+		}
+
+		private void reflectorLightButton_CheckedChanged(object sender, EventArgs e)
+		{
+			if (reflectorLightButton.Checked)
+				useReflector = true;
 		}
 	}
 }
