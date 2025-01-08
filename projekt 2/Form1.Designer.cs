@@ -502,8 +502,8 @@
 			// 
 			lightSourceTrackBar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
 			lightSourceTrackBar.LargeChange = 50;
-			lightSourceTrackBar.Location = new Point(1379, 855);
-			lightSourceTrackBar.Maximum = 1000;
+			lightSourceTrackBar.Location = new Point(1357, 855);
+			lightSourceTrackBar.Maximum = 3000;
 			lightSourceTrackBar.Minimum = -500;
 			lightSourceTrackBar.Name = "lightSourceTrackBar";
 			lightSourceTrackBar.Size = new Size(203, 69);
@@ -527,7 +527,7 @@
 			// 
 			label15.Anchor = AnchorStyles.Top | AnchorStyles.Right;
 			label15.AutoSize = true;
-			label15.Location = new Point(1596, 855);
+			label15.Location = new Point(1579, 855);
 			label15.Name = "label15";
 			label15.Size = new Size(42, 25);
 			label15.TabIndex = 37;

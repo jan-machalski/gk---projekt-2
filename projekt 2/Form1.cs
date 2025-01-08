@@ -28,6 +28,7 @@ namespace projekt_2
 		private bool fillTriangles = true;
 		private int bitmapHeight, bitmapWidth;
 		private System.Windows.Forms.Timer lightMoveTimer;
+		private System.Windows.Forms.Timer pyramidMovementTimer;
 		private float spiralAngle = 0; // Current angle for spiral movement
 		private float spiralRadius = 0; // Current radius for spiral movement
 		private float spiralRadiusIncrement = 2; // Radius increment per step
@@ -36,7 +37,8 @@ namespace projekt_2
 		string dataFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
 		private int reflectorIntensity = 50;
 		private bool useReflector = false;
-
+		List<Triangle> pyramid = new List<Triangle>();
+		int rotationDeg = 0;
 
 
 		public Form1()
@@ -54,6 +56,7 @@ namespace projekt_2
 
 
 			bezierSurface = new BezierSurface(controlPoints, accuracyTrackBar.Value);
+			InitializePyramid();
 
 			InitializeLightMovement();
 
@@ -64,14 +67,103 @@ namespace projekt_2
 			directBitmap = new DirectBitmap(pictureBox1.Width, pictureBox1.Height);
 			pictureBox1.Image = directBitmap.Bitmap;
 		}
+		private Triangle MakeTriangle(Vector3 posA, Vector3 posB, Vector3 posC)
+		{
+			Vector3 AB = posB - posA;
+			Vector3 AC = posC - posA;
+			Vector3 normal = Vector3.Cross(AB, AC);
+			normal = Vector3.Normalize(normal);
+
+			var vA = new Vertex(posA, Vector3.Zero, Vector3.Zero, Vector3.Zero, 0f, 0f);
+			var vB = new Vertex(posB, Vector3.Zero, Vector3.Zero, Vector3.Zero, 0f, 0f);
+			var vC = new Vertex(posC, Vector3.Zero, Vector3.Zero, Vector3.Zero, 0f, 0f);
+
+
+			vA.NormalBeforeRotation = normal;
+			vB.NormalBeforeRotation = normal;
+			vC.NormalBeforeRotation = normal;
+
+			return new Triangle(vA, vB, vC);
+		}
+		private void InitializePyramid()
+		{
+			// Lista trójk¹tów ostros³upa
+			pyramid = new List<Triangle>();
+
+			// Rozmiar podstawy i wysokoœæ ostros³upa
+			float halfBaseSize = 100f; // Po³owa d³ugoœci boku podstawy
+			float height = 400f;      // Wysokoœæ ostros³upa
+
+			// Wierzcho³ki podstawy (w p³aszczyŸnie Z = 0)
+			var v0 = new Vertex(
+				new Vector3(-halfBaseSize, -halfBaseSize, 0), // Pozycja
+				new Vector3(1, 0, 0),                        // TangentU dla podstawy
+				new Vector3(0, 1, 0),                        // TangentV dla podstawy
+				new Vector3(0, 0, 1),                        // Normal (w górê dla podstawy)
+				0, 0                                         // Wspó³rzêdne tekstury (UV)
+			);
+
+			var v1 = new Vertex(
+				new Vector3(halfBaseSize, -halfBaseSize, 0),
+				new Vector3(1, 0, 0),
+				new Vector3(0, 1, 0),
+				new Vector3(0, 0, 1),
+				1, 0
+			);
+
+			var v2 = new Vertex(
+				new Vector3(halfBaseSize, halfBaseSize, 0),
+				new Vector3(1, 0, 0),
+				new Vector3(0, 1, 0),
+				new Vector3(0, 0, 1),
+				1, 1
+			);
+
+			var v3 = new Vertex(
+				new Vector3(-halfBaseSize, halfBaseSize, 0),
+				new Vector3(1, 0, 0),
+				new Vector3(0, 1, 0),
+				new Vector3(0, 0, 1),
+				0, 1
+			);
+
+			var apex = new Vertex(
+				new Vector3(0, 0, height),
+				Vector3.Zero,                             
+				Vector3.Zero,                             
+				Vector3.Zero,                               
+				0.5f, 0.5f                               
+			);
+
+			pyramid.Add(new Triangle(v0, v1, v2)); 
+			pyramid.Add(new Triangle(v0, v2, v3));
+			pyramid.Add(MakeTriangle(v0.PositionBeforeRotation,v1.PositionBeforeRotation,apex.PositionBeforeRotation));
+			pyramid.Add(MakeTriangle(v1.PositionBeforeRotation, v2.PositionBeforeRotation, apex.PositionBeforeRotation));
+			pyramid.Add(MakeTriangle(v2.PositionBeforeRotation, v3.PositionBeforeRotation, apex.PositionBeforeRotation));
+			pyramid.Add(MakeTriangle(v3.PositionBeforeRotation, v0.PositionBeforeRotation, apex.PositionBeforeRotation));
+		}
+
 		private void InitializeLightMovement()
 		{
 			lightMoveTimer = new System.Windows.Forms.Timer();
 			lightMoveTimer.Interval = 50;
 			lightMoveTimer.Tick += LightMoveTimer_Tick;
 			lightMoveTimer.Start();
+			pyramidMovementTimer = new System.Windows.Forms.Timer();
+			pyramidMovementTimer.Interval = 50;
+			pyramidMovementTimer.Tick += PyramidTimer_Tick;
+			pyramidMovementTimer.Start();
 		}
-
+		private void PyramidTimer_Tick(object sender, EventArgs e)
+		{
+			foreach(var t in pyramid)
+			{
+				t.Vertex1.ApplyRotation(rotationDeg, rotationDeg);
+				t.Vertex2.ApplyRotation(rotationDeg, rotationDeg);
+				t.Vertex3.ApplyRotation(rotationDeg, rotationDeg);
+			}
+			rotationDeg = (rotationDeg + 1) % 360;
+		}
 		private void LightMoveTimer_Tick(object sender, EventArgs e)
 		{
 			if (lightMovement)
@@ -88,6 +180,8 @@ namespace projekt_2
 				lightSourcePos = new Vector3(x, y, lightSourcePos.Z);
 
 				lightSourcePos2 = new Vector3(-x, -y, lightSourcePos2.Z);
+
+
 			}
 
 			// Trigger redraw of the surface to reflect the light source's new position
@@ -130,6 +224,10 @@ namespace projekt_2
 					{
 						FillPolygon(new List<Vertex>() { t.Vertex1, t.Vertex2, t.Vertex3 }, directBitmap, zBuffer);
 					});
+					Parallel.ForEach(pyramid, t =>
+					{
+						FillPolygon(new List<Vertex>() { t.Vertex1, t.Vertex2, t.Vertex3 }, directBitmap, zBuffer, true);
+					});
 				}
 
 				if (drawTriangles)
@@ -138,6 +236,8 @@ namespace projekt_2
 					{
 						DrawTriangle(g, t);
 					}
+					foreach(var t in pyramid)
+						DrawTriangle(g, t);
 				}
 
 
@@ -148,7 +248,7 @@ namespace projekt_2
 
 		}
 
-		private void FillPolygon(List<Vertex> vertices, DirectBitmap fastBitmap, float[,] zBuffer)
+		private void FillPolygon(List<Vertex> vertices, DirectBitmap fastBitmap, float[,] zBuffer,bool pyramid = false)
 		{
 			int n = vertices.Count;
 
@@ -228,7 +328,7 @@ namespace projekt_2
 
 						Vector3 pixelColor = Io;
 
-						if (useTexture && textureImage != null)
+						if (!pyramid && useTexture && textureImage != null)
 						{
 							u = Math.Clamp(u, 0f, 1f);
 							v = 1 - Math.Clamp(v, 0f, 1f);
@@ -239,7 +339,7 @@ namespace projekt_2
 							Color texColor = textureImage.GetPixel(textureX, textureY);
 							pixelColor = new Vector3(texColor.R / 255f, texColor.G / 255f, texColor.B / 255f);
 						}
-						if (useNormalMap && normalMap != null)
+						if (!pyramid && useNormalMap && normalMap != null)
 						{
 							u = Math.Clamp(u, 0f, 1f);
 							v = 1 - Math.Clamp(v, 0f, 1f);
@@ -262,7 +362,11 @@ namespace projekt_2
 
 							normal = Vector3.Normalize(normalNew);
 						}
-
+						if (pyramid)
+						{
+							Swap(ref pixelColor.Y, ref pixelColor.Z);
+							Swap(ref pixelColor.X, ref pixelColor.Y);	
+						}
 						Vector3 color = ComputeLighting(normal, pixelColor, position);
 
 						// Convert color from Vector3 (0..1) to Color (0..255)
@@ -405,9 +509,11 @@ namespace projekt_2
 
 			float cosRV2 = Vector3.Dot(R2, V_normalized);
 			cosRV2 = Math.Max(0, cosRV2); // Clamp to 0 if negative
+			Vector3 lp1 = Vector3.Normalize(lightSourcePos);
+			Vector3 lp2 = Vector3.Normalize(lightSourcePos2);
 
-			float factor1 = (float)Math.Pow(Vector3.Dot(L,Vector3.Normalize(lightSourcePos)), reflectorIntensity);
-			float factor2 = (float)Math.Pow(Vector3.Dot(L2, Vector3.Normalize(lightSourcePos2)), reflectorIntensity);
+			float factor1 = (float)Math.Pow(Vector3.Dot(L,lp1), reflectorIntensity);
+			float factor2 = (float)Math.Pow(Vector3.Dot(L2,lp2), reflectorIntensity);
 			if (!useReflector)
 				factor1 = factor2 = 1;
 

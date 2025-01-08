@@ -36,7 +36,7 @@ namespace projekt_2
             U = u;
             V = v;
         }
-        public void ApplyRotation(float angleX, float angleZ, Vector3[,] controlPoints)
+        public void ApplyRotation(float angleX, float angleZ, Vector3[,] controlPoints = null)
         {
             float angleXInRadians = MathF.PI * angleX / 180.0f;
             float angleZInRadians = MathF.PI * angleZ / 180.0f;
@@ -57,8 +57,11 @@ namespace projekt_2
             TangentVAfterRotation = RotateVectorZ(TangentVBeforeRotation, cosZ, sinZ);
             TangentVAfterRotation = RotateVectorX(TangentVAfterRotation, cosX, sinX);
 
-            NormalAfterRotation = Vector3.Cross(TangentUAfterRotation, TangentVAfterRotation);
-            NormalAfterRotation = Vector3.Normalize(NormalAfterRotation);
+            //NormalAfterRotation = Vector3.Cross(TangentUAfterRotation, TangentVAfterRotation);
+            //NormalAfterRotation = Vector3.Normalize(NormalAfterRotation);
+            NormalAfterRotation = RotateVectorZ(NormalBeforeRotation, cosZ, sinZ);
+            NormalAfterRotation = RotateVectorX(NormalAfterRotation, cosX, sinX);
+
 
         }
 
